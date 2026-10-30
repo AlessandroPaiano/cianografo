@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Cianografo</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -71,6 +72,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .empty:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .board.over{outline:2px dashed var(--accent);outline-offset:-6px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
+.seg.mode{display:flex}.seg.mode button{flex:1}
+.hint{margin:0;font-size:13px;color:var(--muted)}
+body[data-mode="draw"] .text-only,body[data-mode="text"] .draw-only{display:none!important}
 .status{font:12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
 .export{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
 .export img{width:220px;max-width:100%;border:1px solid var(--line);border-radius:3px}
@@ -88,16 +92,21 @@ details .inner{display:flex;flex-direction:column;gap:10px;margin-top:10px}
   <header>
     <div>
       <h1>Ciano<span>grafo</span></h1>
-      <p class="sub">Carica la foto di un disegno a matita o a penna: ombre e carta vengono tolte, restano le linee, stampate come una cianografia con squadratura e cartiglio.</p>
+      <p class="sub">Carica la foto di un disegno o di appunti scritti a mano: ombre, carta e quadretti vengono tolti, resta il tratto, stampato come una cianografia o su pergamena.</p>
     </div>
-    <span class="status" id="status">In attesa di un disegno</span>
+    <span class="status" id="status">In attesa di una foto</span>
   </header>
 
   <div class="main">
     <aside class="panel">
       <div class="group">
-        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Carica un disegno">
-          <strong>Carica un disegno</strong>
+        <div class="seg mode" role="group" aria-label="Tipo di foto">
+          <button type="button" id="m-draw" aria-pressed="true">Disegno</button>
+          <button type="button" id="m-text" aria-pressed="false">Testo scritto</button>
+        </div>
+        <p class="hint" id="mode-hint"></p>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Carica una foto">
+          <strong>Carica una foto</strong>
           Trascina qui una foto, incollala, o tocca per sceglierla
         </div>
         <input type="file" id="file" accept="image/*" hidden>
@@ -109,6 +118,8 @@ details .inner{display:flex;flex-direction:column;gap:10px;margin-top:10px}
         <div class="row"><label for="contrast">Morbidezza tratto <output id="o-contrast"></output></label><input type="range" id="contrast" min="4" max="40" value="18"></div>
         <div class="row"><label for="shadow">Rimozione ombre <output id="o-shadow"></output></label><input type="range" id="shadow" min="0" max="60" value="25"></div>
         <div class="row"><label for="thick">Spessore <output id="o-thick"></output></label><input type="range" id="thick" min="0" max="3" value="0"></div>
+        <div class="row text-only"><label for="specks">Pulizia puntini <output id="o-specks"></output></label><input type="range" id="specks" min="0" max="60" value="14"></div>
+        <label class="check text-only"><input type="checkbox" id="rules" checked> Togli righe e quadretti del quaderno</label>
         <div class="row"><label for="edge">Pulizia bordi <output id="o-edge"></output></label><input type="range" id="edge" min="0" max="8" step="0.5" value="2"></div>
       </div>
 
@@ -117,20 +128,20 @@ details .inner{display:flex;flex-direction:column;gap:10px;margin-top:10px}
         <div class="swatches" id="swatches"></div>
         <div class="swname" id="swname"></div>
         <label class="check"><input type="checkbox" id="grid" checked> Griglia millimetrata</label>
-        <label class="check"><input type="checkbox" id="frame" checked> Squadratura e cartiglio</label>
+        <label class="check"><input type="checkbox" id="frame" checked> <span id="frame-label">Squadratura e cartiglio</span></label>
         <label class="check"><input type="checkbox" id="texture" checked> Grana della carta</label>
       </div>
 
       <div class="group">
-        <div class="gl">Cartiglio</div>
-        <div class="field"><label for="f-title">Titolo</label><input id="f-title" value="" placeholder="Titolo del disegno"></div>
+        <div class="gl" id="tb-label">Cartiglio</div>
+        <div class="field"><label for="f-title">Titolo</label><input id="f-title" value="" placeholder="Titolo"></div>
         <div class="grid2">
-          <div class="field"><label for="f-author">Disegnato da</label><input id="f-author" value="A. Paiano"></div>
+          <div class="field"><label for="f-author" id="author-label">Disegnato da</label><input id="f-author" value="A. Paiano"></div>
           <div class="field"><label for="f-date">Data</label><input id="f-date" value=""></div>
-          <div class="field"><label for="f-scale">Scala</label><input id="f-scale" value="1:1"></div>
-          <div class="field"><label for="f-sheet">Tavola</label><input id="f-sheet" value="01 / 01"></div>
+          <div class="field draw-only"><label for="f-scale">Scala</label><input id="f-scale" value="1:1"></div>
+          <div class="field draw-only"><label for="f-sheet">Tavola</label><input id="f-sheet" value="01 / 01"></div>
         </div>
-        <div class="field"><label for="f-note">Note</label><input id="f-note" value="" placeholder="Materiali, quote, avvertenze"></div>
+        <div class="field draw-only"><label for="f-note">Note</label><input id="f-note" value="" placeholder="Materiali, quote, avvertenze"></div>
       </div>
 
       <div class="group">
@@ -160,8 +171,8 @@ details .inner{display:flex;flex-direction:column;gap:10px;margin-top:10px}
       <div class="board" id="board">
         <button class="empty" id="empty" type="button">
           <svg viewBox="0 0 120 80" width="120" height="80" aria-hidden="true"><rect x="6" y="6" width="108" height="68" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/><path d="M22 58 L48 30 L64 46 L76 36 L98 58" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="84" cy="22" r="5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-          <strong>Nessun disegno caricato</strong>
-          <span>Trascina qui la foto del tuo disegno, incollala con Ctrl+V oppure tocca per sceglierla. JPG o PNG.</span>
+          <strong>Nessuna foto caricata</strong>
+          <span>Trascina qui la foto di un disegno o di una pagina di appunti, incollala con Ctrl+V oppure tocca per sceglierla. JPG o PNG.</span>
         </button>
         <canvas id="out" width="10" height="10" aria-label="Anteprima blueprint" hidden></canvas>
       </div>
@@ -186,7 +197,7 @@ const PALETTES = {
   perg:    {name:"Pergamena",  bg:[232,214,174],ink:[70,42,20],    grid:.09, parch:true},
 };
 const $ = id => document.getElementById(id);
-const S = {img:null, palette:"ciano", view:"bp", A:null, alpha:null, ink:null, sample:true};
+const S = {mode:"draw", img:null, palette:"ciano", view:"bp", A:null, alpha:null, ink:null, sample:true};
 
 /* ---------- elaborazione immagine ---------- */
 function downBox(g,w,h,f){const sw=Math.max(1,Math.floor(w/f)),sh=Math.max(1,Math.floor(h/f)),o=new Float32Array(sw*sh);
@@ -212,11 +223,14 @@ function stageA(){
   const img=S.img,nw=img.naturalWidth,nh=img.naturalHeight;
   const ct=+$("c-t").value/100,cb=+$("c-b").value/100,cl=+$("c-l").value/100,cr=+$("c-r").value/100;
   const cx=nw*cl,cy=nh*ct,cw=Math.max(20,nw*(1-cl-cr)),ch=Math.max(20,nh*(1-ct-cb));
-  const sc=Math.min(1,2000/Math.max(cw,ch)),w=Math.round(cw*sc),h=Math.round(ch*sc);
+  const sc=Math.min(1,(S.mode==="text"?2600:2000)/Math.max(cw,ch)),w=Math.round(cw*sc),h=Math.round(ch*sc);
   const src=document.createElement("canvas");src.width=w;src.height=h;
   const sx=src.getContext("2d",{willReadFrequently:true});sx.drawImage(img,cx,cy,cw,ch,0,0,w,h);
   const d=sx.getImageData(0,0,w,h).data,g=new Float32Array(w*h);
-  for(let i=0,j=0;i<g.length;i++,j+=4)g[i]=(.299*d[j]+.587*d[j+1]+.114*d[j+2])/255;
+  // In modalità testo con "togli righe": metà luminanza, metà canale più chiaro.
+  // Le righe stampate (azzurre, rosse) sono chiare in almeno un canale, l'inchiostro no.
+  const mix=S.mode==="text"&&$("rules").checked?.5:0;
+  for(let i=0,j=0;i<g.length;i++,j+=4){const lum=(.299*d[j]+.587*d[j+1]+.114*d[j+2])/255,mx=Math.max(d[j],d[j+1],d[j+2])/255;g[i]=lum*(1-mix)+mx*mix;}
   const f=Math.max(2,Math.round(Math.max(w,h)/375));
   const s=downBox(g,w,h,f);
   let b=morph(s.a,s.w,s.h,3,true);b=morph(b,s.w,s.h,3,false);b=boxBlur(b,s.w,s.h,1);
@@ -224,10 +238,58 @@ function stageA(){
   S.A={w,h,src,gb:blur121(g,w,h),bg,pap:Math.max(.05,percentile(bg,.9))};
 }
 
+/* Righe del quaderno: tratti dritti molto più lunghi di qualsiasi lettera */
+function removeRules(a,w,h){
+  const on=new Uint8Array(w*h);for(let i=0;i<on.length;i++)on[i]=a[i]>.3?1:0;
+  const kill=new Uint8Array(w*h);
+  const scan=(horiz)=>{const n1=horiz?h:w,n2=horiz?w:h,minLen=Math.round(n2*.3),idx=horiz?(p,q)=>p*w+q:(p,q)=>q*w+p;
+    for(let p=0;p<n1;p++){let start=-1;
+      for(let q=0;q<=n2;q++){
+        // tolleranza di 1 px per righe leggermente storte
+        let v=0;if(q<n2){for(let o=-1;o<=1;o++){const pp=p+o;if(pp>=0&&pp<n1&&on[idx(pp,q)]){v=1;break;}}}
+        if(v&&start<0)start=q;
+        if(!v&&start>=0){if(q-start>=minLen)for(let r=start;r<q;r++)for(let o=-1;o<=1;o++){const pp=p+o;if(pp>=0&&pp<n1&&on[idx(pp,r)])kill[idx(pp,r)]=1;}start=-1;}
+      }}};
+  scan(true);scan(false);
+  const out=new Float32Array(a);const d=3;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(!kill[i])continue;
+    // dove una lettera attraversa la riga, il tratto continua sopra e sotto (o ai lati): lo teniamo
+    const up=y-d>=0&&on[i-d*w]&&!kill[i-d*w],dn=y+d<h&&on[i+d*w]&&!kill[i+d*w];
+    const lf=x-d>=0&&on[i-d]&&!kill[i-d],rt=x+d<w&&on[i+d]&&!kill[i+d];
+    if(!((up&&dn)||(lf&&rt)))out[i]=0;}
+  return out;
+}
+/* Puntini e polvere: macchie isolate più piccole della soglia */
+function removeSpecks(a,w,h,minArea){
+  if(minArea<2)return a;
+  const lab=new Int32Array(w*h),stack=new Int32Array(w*h),out=new Float32Array(a);
+  // tabella integrale dell'inchiostro, per sapere se un puntino ha vicini (punto della i, punteggiatura)
+  const W1=w+1,I=new Int32Array(W1*(h+1));
+  for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=a[y*w+x]>.2?1:0;I[(y+1)*W1+x+1]=I[y*W1+x+1]+row;}}
+  const cnt=(x0,y0,x1,y1)=>{x0=Math.max(0,x0);y0=Math.max(0,y0);x1=Math.min(w-1,x1);y1=Math.min(h-1,y1);return I[(y1+1)*W1+x1+1]-I[y0*W1+x1+1]-I[(y1+1)*W1+x0]+I[y0*W1+x0];};
+  const R=Math.round(Math.sqrt(minArea)*3.5);
+  let id=0;
+  for(let s0=0;s0<w*h;s0++){if(lab[s0]||a[s0]<=.2)continue;id++;let sp=0,n=0;stack[sp++]=s0;lab[s0]=id;const list=[];
+    while(sp){const i=stack[--sp];list.push(i);n++;const x=i%w,y=(i-x)/w;
+      for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=w)continue;const j=yy*w+xx;if(!lab[j]&&a[j]>.2){lab[j]=id;stack[sp++]=j;}}}
+      if(n>minArea)break;}
+    let isolated=false;
+    if(n<=minArea){let x0=w,y0=h,x1=0,y1=0;for(const i of list){const x=i%w,y=(i-x)/w;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+      isolated=cnt(x0-R,y0-R,x1+R,y1+R)-n<=0;}
+    if(isolated){for(const i of list){out[i]=0;}
+      // azzera anche il bordo sfumato attorno al puntino
+      for(const i of list){const x=i%w,y=(i-x)/w;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const yy=y+dy,xx=x+dx;if(yy>=0&&yy<h&&xx>=0&&xx<w&&a[yy*w+xx]<=.2)out[yy*w+xx]=0;}}}
+    else{ // componente grande: completa l'etichettatura senza misurarla
+      while(sp){const i=stack[--sp];const x=i%w,y=(i-x)/w;for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=w)continue;const j=yy*w+xx;if(!lab[j]&&a[j]>.2){lab[j]=id;stack[sp++]=j;}}}}}
+  }
+  return out;
+}
+
 /* Fase B: estrazione del tratto */
 function stageB(){
   const {w,h,gb,bg,pap}=S.A;
-  const t0=.2-(+$("sens").value/100)*.18,sf=+$("contrast").value/100,k=+$("shadow").value/100;
+  const txt=S.mode==="text",sv=+$("sens").value/100;
+  const t0=txt?.36-sv*.3:.2-sv*.18,sf=+$("contrast").value/100,k=+$("shadow").value/100;
   const e=(+$("edge").value/100)*Math.max(w,h);
   let a=new Float32Array(w*h);
   for(let y=0;y<h;y++){const ey=Math.min(y,h-1-y);
@@ -237,6 +299,8 @@ function stageB(){
       let v=(ink-tt)/sf; if(v<=0){a[i]=0;continue;} if(v>1)v=1; v=Math.pow(v,.8);
       if(e>0){const dd=Math.min(x,w-1-x,ey);if(dd<e)v*=Math.min(1,Math.max(0,(dd-e*.5)/(e*.5)));}
       a[i]=v;}}
+  if(txt&&$("rules").checked)a=removeRules(a,w,h);
+  if(txt&&+$("specks").value>0){const u=Math.max(w,h)/1000;a=removeSpecks(a,w,h,Math.round(+$("specks").value*u*u*2.5));}
   for(let p=0;p<+$("thick").value;p++)a=morph(a,w,h,1,true);
   S.alpha=a;
 }
@@ -290,8 +354,10 @@ function stageC(){
   const P=PALETTES[S.palette],{w,h}=S.A,a=S.alpha,cv=$("out"),ctx=cv.getContext("2d");
   if(S.view==="src"){cv.width=w;cv.height=h;ctx.drawImage(S.A.src,0,0);return;}
   const frame=$("frame").checked,L=Math.max(w,h),u=L/1000;
-  const m=frame?Math.round(L*.055):Math.round(L*.03),tbH=frame?Math.round(Math.max(130*u,h*.17)):0;
-  const W=w+2*m,H=h+2*m+tbH;cv.width=W;cv.height=H;
+  const txt=S.mode==="text";
+  const m=frame?Math.round(L*(txt?.045:.055)):Math.round(L*.03),tbH=frame&&!txt?Math.round(Math.max(130*u,h*.17)):0;
+  const hdH=frame&&txt?Math.round(Math.max(70*u,L*.075)):0,oy=m+hdH;
+  const W=w+2*m,H=h+2*m+tbH+hdH;cv.width=W;cv.height=H;
   ctx.fillStyle=rgba(P.bg,1);ctx.fillRect(0,0,W,H);
   const light=P.bg[0]+P.bg[1]+P.bg[2]>450,tex=$("texture").checked;
   if(P.parch&&tex){ctx.drawImage(parchment(W,H).base,0,0);ctx.globalCompositeOperation="multiply";ctx.fillStyle=grainPattern(ctx);ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation="source-over";}
@@ -314,11 +380,26 @@ function stageC(){
   const lay=document.createElement("canvas");lay.width=w;lay.height=h;const lx=lay.getContext("2d"),id=lx.createImageData(w,h),dd=id.data;
   for(let i=0,j=0;i<a.length;i++,j+=4){dd[j]=P.ink[0];dd[j+1]=P.ink[1];dd[j+2]=P.ink[2];dd[j+3]=a[i]*255;}
   lx.putImageData(id,0,0);
-  if(!light){ctx.save();ctx.shadowColor=rgba(P.ink,.35);ctx.shadowBlur=2.5*u;ctx.drawImage(lay,m,m);ctx.restore();}
-  else if(P.parch){ctx.save();ctx.globalAlpha=.92;ctx.shadowColor=rgba(P.ink,.3);ctx.shadowBlur=1.2*u;ctx.drawImage(lay,m,m);ctx.restore();}
-  else ctx.drawImage(lay,m,m);
-  if(frame)drawFrame(ctx,W,H,m,tbH,u,P);
+  if(!light){ctx.save();ctx.shadowColor=rgba(P.ink,.35);ctx.shadowBlur=2.5*u;ctx.drawImage(lay,m,oy);ctx.restore();}
+  else if(P.parch){ctx.save();ctx.globalAlpha=.92;ctx.shadowColor=rgba(P.ink,.3);ctx.shadowBlur=1.2*u;ctx.drawImage(lay,m,oy);ctx.restore();}
+  else ctx.drawImage(lay,m,oy);
+  if(frame&&!txt)drawFrame(ctx,W,H,m,tbH,u,P);
+  if(frame&&txt)drawHeader(ctx,W,H,m,hdH,u,P);
   if(P.parch&&tex){ctx.globalCompositeOperation="multiply";ctx.drawImage(parchment(W,H).age,0,0);ctx.globalCompositeOperation="source-over";}
+}
+function drawHeader(ctx,W,H,m,hdH,u,P){
+  const ink=rgba(P.ink,.92),soft=rgba(P.ink,.62),o=m*.4;
+  ctx.strokeStyle=soft;ctx.lineWidth=Math.max(1,u);ctx.strokeRect(o,o,W-2*o,H-2*o);
+  const x0=m,x1=W-m,base=m+hdH*.62;
+  ctx.textBaseline="alphabetic";
+  const right=[$("f-author").value,$("f-date").value].filter(Boolean).join("  ·  ");
+  ctx.font=`400 ${Math.round(hdH*.2)}px "B612 Mono", monospace`;ctx.fillStyle=soft;ctx.textAlign="right";
+  const rw=right?ctx.measureText(right).width:0;if(right)ctx.fillText(right,x1,base);
+  ctx.textAlign="left";ctx.fillStyle=ink;
+  const t=($("f-title").value||"").toUpperCase();
+  if(t)fitText(ctx,t,'600 SIZE "Saira Condensed", "Arial Narrow", sans-serif',Math.round(hdH*.5),x1-x0-rw-24*u),ctx.fillText(t,x0,base);
+  ctx.strokeStyle=ink;ctx.lineWidth=Math.max(1.5,u*2);ctx.beginPath();ctx.moveTo(x0,m+hdH*.8);ctx.lineTo(x1,m+hdH*.8);ctx.stroke();
+  ctx.lineWidth=Math.max(1,u*.8);ctx.beginPath();ctx.moveTo(x0,m+hdH*.8+4*u);ctx.lineTo(x1,m+hdH*.8+4*u);ctx.stroke();
 }
 function drawFrame(ctx,W,H,m,tbH,u,P){
   const ink=rgba(P.ink,.92),soft=rgba(P.ink,.6);
@@ -368,12 +449,31 @@ function run(){
   $("export").hidden=true;
 }
 function outputs(){
-  const fmt={sens:v=>v,contrast:v=>v,shadow:v=>v,thick:v=>["fine","+1","+2","+3"][v],edge:v=>v+"%","c-t":v=>v+"%","c-b":v=>v+"%","c-l":v=>v+"%","c-r":v=>v+"%"};
+  const fmt={specks:v=>v==0?"no":v,sens:v=>v,contrast:v=>v,shadow:v=>v,thick:v=>["fine","+1","+2","+3"][v],edge:v=>v+"%","c-t":v=>v+"%","c-b":v=>v+"%","c-l":v=>v+"%","c-r":v=>v+"%"};
   for(const k in fmt)$("o-"+k).textContent=fmt[k]($(k).value);
 }
-["sens","contrast","shadow","thick","edge"].forEach(id=>$(id).addEventListener("input",()=>{outputs();schedule(2);}));
+["sens","contrast","shadow","thick","edge","specks"].forEach(id=>$(id).addEventListener("input",()=>{outputs();schedule(2);}));
 ["c-t","c-b","c-l","c-r"].forEach(id=>$(id).addEventListener("input",()=>{outputs();schedule(3);}));
 ["grid","frame","texture"].forEach(id=>$(id).addEventListener("change",()=>schedule(1)));
+$("rules").addEventListener("change",()=>schedule(3));
+const PRESETS={
+  draw:{sens:67,contrast:18,shadow:25,thick:0,edge:2,grid:true},
+  text:{sens:55,contrast:8,shadow:35,thick:0,edge:2,grid:false,specks:14,rules:true},
+};
+const MODE_TXT={
+  draw:{hint:"Linee a matita o penna, anche leggere. Tiene le sfumature del tratto.",frame:"Squadratura e cartiglio",tb:"Cartiglio",author:"Disegnato da"},
+  text:{hint:"Appunti a mano: scrittura nitida, quadretti e righe del quaderno rimossi.",frame:"Cornice e intestazione",tb:"Intestazione",author:"Autore"},
+};
+function setMode(mode,applyPreset){
+  S.mode=mode;document.body.dataset.mode=mode;
+  $("m-draw").setAttribute("aria-pressed",mode==="draw");$("m-text").setAttribute("aria-pressed",mode==="text");
+  const T=MODE_TXT[mode];$("mode-hint").textContent=T.hint;$("frame-label").textContent=T.frame;$("tb-label").textContent=T.tb;$("author-label").textContent=T.author;
+  if(applyPreset){const p=PRESETS[mode];for(const k in p){const el=$(k);if(el.type==="checkbox")el.checked=p[k];else el.value=p[k];}if(PALETTES[S.palette].parch)$("grid").checked=false;}
+  try{localStorage.setItem("cianografo-mode",mode);}catch(e){}
+  outputs();schedule(3);
+}
+$("m-draw").onclick=()=>{if(S.mode!=="draw")setMode("draw",true);};
+$("m-text").onclick=()=>{if(S.mode!=="text")setMode("text",true);};
 ["f-title","f-author","f-date","f-scale","f-sheet","f-note"].forEach(id=>$(id).addEventListener("input",()=>schedule(1)));
 
 const swWrap=$("swatches");
@@ -408,7 +508,10 @@ $("copy").onclick=async()=>{const btn=$("copy");
 
 $("swname").innerHTML="Stile: <b>"+PALETTES[S.palette].name+"</b>";
 {const d=new Date();$("f-date").value=[d.getDate(),d.getMonth()+1,d.getFullYear()].map(v=>String(v).padStart(2,"0")).join(".");}
+{let m0="draw";try{m0=localStorage.getItem("cianografo-mode")||"draw";}catch(e){}setMode(m0==="text"?"text":"draw",m0==="text");}
 outputs();
 (document.fonts&&document.fonts.load?Promise.all([document.fonts.load('600 20px "Saira Condensed"'),document.fonts.load('700 12px "B612 Mono"')]).catch(()=>{}):Promise.resolve())
   .then(()=>{});
 </script>
+
+</body></html>
