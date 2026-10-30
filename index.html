@@ -1,4 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Cianografo</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -79,6 +78,7 @@ body[data-mode="draw"] .text-only,body[data-mode="text"] .draw-only{display:none
 .export{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
 .export img{width:220px;max-width:100%;border:1px solid var(--line);border-radius:3px}
 .export div{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.export #exp-close{align-self:flex-start}
 .export p{margin:0;color:var(--muted);font-size:14px;max-width:60ch}
 .tag{font:10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
 details summary{cursor:pointer;font:700 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);list-style:none}
@@ -165,7 +165,16 @@ details .inner{display:flex;flex-direction:column;gap:10px;margin-top:10px}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="copy" disabled>Copia immagine</button>
-          <button class="btn primary" id="save" disabled>Prepara PNG</button>
+          <button class="btn primary" id="save" disabled>Scarica PNG</button>
+        </div>
+      </div>
+      <div class="export" id="export" hidden>
+        <img id="exp-img" alt="Blueprint pronto da salvare">
+        <div>
+          <span class="tag">PNG pronto</span>
+          <p id="exp-info"></p>
+          <p>Il download diretto non è disponibile in questa vista. Per salvarlo: clic destro sull'immagine e scegli <b>Salva immagine</b>; da telefono tienila premuta.</p>
+          <button class="btn" type="button" id="exp-close">Chiudi</button>
         </div>
       </div>
       <div class="board" id="board">
@@ -175,14 +184,6 @@ details .inner{display:flex;flex-direction:column;gap:10px;margin-top:10px}
           <span>Trascina qui la foto di un disegno o di una pagina di appunti, incollala con Ctrl+V oppure tocca per sceglierla. JPG o PNG.</span>
         </button>
         <canvas id="out" width="10" height="10" aria-label="Anteprima blueprint" hidden></canvas>
-      </div>
-      <div class="export" id="export" hidden>
-        <img id="exp-img" alt="Blueprint pronto da salvare">
-        <div>
-          <span class="tag">PNG pronto</span>
-          <p id="exp-info"></p>
-          <p>Per salvarlo: clic destro sull'immagine e scegli <b>Salva immagine</b>; da telefono tienila premuta.</p>
-        </div>
       </div>
     </section>
   </div>
@@ -500,8 +501,32 @@ document.addEventListener("drop",e=>loadFile(e.dataTransfer.files[0]));
 document.addEventListener("paste",e=>{const it=[...e.clipboardData.items].find(i=>i.type.startsWith("image/"));if(it)loadFile(it.getAsFile());});
 
 function withBlob(cb){if(S.view!=="bp")setView("bp");requestAnimationFrame(()=>requestAnimationFrame(()=>$("out").toBlob(cb,"image/png")));}
-$("save").onclick=()=>withBlob(b=>{const url=URL.createObjectURL(b),c=$("out");$("exp-img").src=url;
-  $("exp-info").textContent=`${c.width}×${c.height} px · ${(b.size/1024/1024).toFixed(1)} MB`;$("export").hidden=false;});
+/* Salvataggio: nella pagina pubblicata usa la conferma di download di Claude;
+   aperta come file dal computer scarica direttamente; altrimenti mostra l'immagine da salvare a mano. */
+let dlCap=null;
+if(window.claude&&window.claude.use){window.claude.use("downloads").then(d=>{dlCap=d;}).catch(()=>{dlCap=null;});}
+function fileName(){
+  const base=($("f-title").value||"cianografo").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,60)||"cianografo";
+  return `${base}-${PALETTES[S.palette].name.toLowerCase()}.png`;
+}
+function flashSave(msg){const btn=$("save");btn.textContent=msg;setTimeout(()=>{btn.textContent="Scarica PNG";},2600);}
+function showExport(b){const c=$("out");$("exp-img").src=URL.createObjectURL(b);
+  $("exp-info").textContent=`${fileName()} · ${c.width}×${c.height} px · ${(b.size/1024/1024).toFixed(1)} MB`;
+  $("export").hidden=false;$("export").scrollIntoView({behavior:"smooth",block:"start"});}
+$("exp-close").onclick=()=>{$("export").hidden=true;};
+$("save").onclick=()=>{const btn=$("save");if(btn.disabled)return;btn.disabled=true;btn.textContent="Preparo…";
+  withBlob(async b=>{btn.disabled=false;btn.textContent="Scarica PNG";
+    if(!b){flashSave("Immagine troppo grande");return;}
+    if(dlCap){
+      try{await dlCap.save({filename:fileName(),data:b});flashSave("Salvato");return;}
+      catch(e){const c=e&&e.code;
+        if(c==="declined")return;
+        if(c==="rate_limited"){flashSave("Attendi e riprova");return;}
+        /* unavailable o altro: si passa al salvataggio manuale */}
+    }
+    if(!window.claude){const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=fileName();document.body.appendChild(a);a.click();a.remove();flashSave("Scaricato");return;}
+    showExport(b);
+  });};
 $("copy").onclick=async()=>{const btn=$("copy");
   try{const p=new Promise(res=>withBlob(res));await navigator.clipboard.write([new ClipboardItem({"image/png":p})]);btn.textContent="Copiata";}
   catch(err){btn.textContent="Copia non consentita: usa Prepara PNG";}setTimeout(()=>btn.textContent="Copia immagine",2600);};
@@ -513,5 +538,3 @@ outputs();
 (document.fonts&&document.fonts.load?Promise.all([document.fonts.load('600 20px "Saira Condensed"'),document.fonts.load('700 12px "B612 Mono"')]).catch(()=>{}):Promise.resolve())
   .then(()=>{});
 </script>
-
-</body></html>
